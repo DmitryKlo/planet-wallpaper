@@ -39,12 +39,20 @@ def verify_assets() -> dict:
     return manifest
 
 
+def baker_compatibility_arguments(executable: str) -> list[str]:
+    # New Qt releases expose an explicit Qt 6 compatibility flag. Older
+    # Qt 6 bakers already target Qt 6 and reject that option entirely.
+    result = subprocess.run([executable, "--help"], capture_output=True, text=True, check=True)
+    return ["--qt6"] if "--qt6" in result.stdout + result.stderr else []
+
+
 def build(output: Path | None = None) -> Path:
     output = (output or ROOT / "build/runtime").resolve()
     manifest = verify_assets()
     baker = qt_tool("qsb")
     if output.exists() and not (output / ".planet-wallpaper-build").is_file():
         raise RuntimeError("Refusing to replace an unmarked build directory")
+    compatibility = baker_compatibility_arguments(baker)
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=".planet-build-", dir=output.parent))
     try:
@@ -66,7 +74,7 @@ def build(output: Path | None = None) -> Path:
                 text = source.read_text().replace("@TEST_OUTPUT@", test_output)
                 (tests / source.name).write_text(text)
         for shader in sorted(temporary.rglob("*.frag")):
-            subprocess.run([baker, "--qt6", "-o", str(shader) + ".qsb", str(shader)], check=True)
+            subprocess.run([baker, *compatibility, "-o", str(shader) + ".qsb", str(shader)], check=True)
         if output.exists():
             shutil.rmtree(output)
         temporary.rename(output)
