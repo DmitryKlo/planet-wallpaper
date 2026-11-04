@@ -1,0 +1,24 @@
+name: Check source and packaging
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install Qt shader baker
+        run: sudo apt-get update && sudo apt-get install -y qt6-shader-baker
+      - name: Audit files and history
+        run: python3 scripts/audit.py --history
+      - name: Check packaging and asset checksums
+        run: python3 -m unittest discover -s tests -v
+      - name: Compile shaders and assemble runtime
+        run: python3 scripts/build.py

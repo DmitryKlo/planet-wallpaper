@@ -1,0 +1,16 @@
+// Merge these blocks into your Niri configuration. If the blocks already
+// exist, add their contents there rather than replacing your other settings.
+layer-rule {
+    match namespace="^noctalia-wallpaper-planet-"
+    place-within-backdrop true
+}
+
+layout {
+    background-color "transparent"
+}
+
+overview {
+    workspace-shadow {
+        off
+    }
+}

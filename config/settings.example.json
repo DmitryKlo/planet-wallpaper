@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "view": "horizon",
+  "periodSeconds": 360,
+  "framesPerSecond": 30,
+  "speed": 1,
+  "cloudAmount": 0.9,
+  "renderer": "weather-layers-v8",
+  "surfaceSoftness": 0.85,
+  "cityGlow": 0.28,
+  "weatherEnabled": true,
+  "planetVisualVersion": 6,
+  "followNoctaliaWallpaper": false
+}

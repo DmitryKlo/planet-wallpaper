@@ -1,0 +1,18 @@
+{
+  "space-without-clouds.png": {
+    "sha256": "72cc8e255e098302136b65cccd587f367b5d6685f78f22e48f588a02eb107bb0",
+    "bytes": 1972833
+  },
+  "earth-surface-v6-clear-ocean.png": {
+    "sha256": "f0ef2a6e8863bc25a71a377b1c6bab989a53b97223b422e67c63abe2ed759c76",
+    "bytes": 15279570
+  },
+  "earth-surface-pixel-v8.png": {
+    "sha256": "741d8c78cd14a13fa02cd23915128649fa6cb73eaa70735e3afe460180b17cba",
+    "bytes": 12562070
+  },
+  "earth-emission-v8.png": {
+    "sha256": "a28a4d2717f8cad5576a98067a0c397f270b43f6e0b5453b244985e00dec50c6",
+    "bytes": 13606000
+  }
+}

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+config_root="${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/planet-wallpaper"
+qs_binary="${PLANET_WALLPAPER_QS:-qs}"
+if ! command -v "$qs_binary" >/dev/null 2>&1; then
+    qs_binary=quickshell
+fi
+
+ipc() { "$qs_binary" -p "$config_root" ipc call planet "$@"; }
+
+case "${1:-status}" in
+    on) systemctl --user enable --now planet-wallpaper.service ;;
+    off) systemctl --user disable --now planet-wallpaper.service ;;
+    pause|resume|status) ipc "${1:-status}" ;;
+    speed) ipc speed "${2:?Usage: planet-wallpaper speed 0.1..10}" ;;
+    view) ipc view "${2:?Usage: planet-wallpaper view horizon|globe|venus}" ;;
+    weather)
+        case "${2:-status}" in
+            on|off|toggle|status) ipc weather "${2:-status}" ;;
+            *) printf '%s\n' 'Usage: planet-wallpaper weather {on|off|toggle|status}'; exit 2 ;;
+        esac ;;
+    *) printf '%s\n' 'Usage: planet-wallpaper {on|off|pause|resume|status|speed 0.1..10|view horizon|globe|venus|weather on|off|toggle|status}'; exit 2 ;;
+esac
