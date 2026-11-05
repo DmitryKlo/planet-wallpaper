@@ -96,6 +96,16 @@ void main() {
         vec2 sphereUV = vec2(fract(longitude/(2.0*PI)+0.5+ubuf.phase),
                              acos(latitude)/PI);
         vec3 field = atmosphere(sphereUV);
+        // Longitude is undefined at the poles. Fade the retained field to a
+        // longitude-independent polar value before its texels become spokes.
+        float polarBlend = smoothstep(0.97,0.995,abs(latitude));
+        if (polarBlend > 0.0) {
+            vec3 polarField = 0.25*(atmosphere(vec2(0.125,sphereUV.y))
+                                 +atmosphere(vec2(0.375,sphereUV.y))
+                                 +atmosphere(vec2(0.625,sphereUV.y))
+                                 +atmosphere(vec2(0.875,sphereUV.y)));
+            field = mix(field,polarField,polarBlend);
+        }
         float warp = (field.g-0.5)*0.25;
         float bands = 0.58*field.r+0.42*(0.5+0.5*sin((latitude+warp)*31.0));
         vec3 clouds = mix(vec3(0.65,0.48,0.36),vec3(0.89,0.79,0.61),
