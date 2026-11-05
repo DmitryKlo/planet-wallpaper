@@ -23,6 +23,10 @@ ShellRoot {
     readonly property string configHome: Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config"
     readonly property string cacheHome: Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache"
     readonly property real periodSeconds: Math.max(30, Number(options.periodSeconds) || 360)
+    readonly property real modelDaySeconds: options.view === "venus" ? 345600
+                                           : options.view === "saturn" ? 38520 : 86400
+    readonly property double activeModelTimeSeconds: options.view === "venus" || options.view === "saturn"
+        ? cloudTime * modelDaySeconds / periodSeconds : modelTimeSeconds
     readonly property int framesPerSecond: Math.min(60, Math.max(1, Number(options.framesPerSecond) || 30))
     readonly property bool hasVisiblePanel: panels.some(panel => panel.visible)
 
@@ -103,8 +107,11 @@ ShellRoot {
         PanelWindow {
             id: panel
             required property ShellScreen modelData
-            // Both optional components provide the same small render interface.
-            readonly property var currentScene: scene.item
+            // Every planet provides the same small render interface.
+            readonly property string selectedScene: root.options.view === "venus" ? "venus"
+                                                   : root.options.view === "saturn" ? "saturn" : "earth"
+            readonly property var currentScene: selectedScene === "venus" ? venusLoader.item
+                                               : selectedScene === "saturn" ? saturnLoader.item : earthLoader.item
             screen: modelData
             // Shader compilation needs the first visible frame.
             visible: root.selectedOn(modelData.name) && currentScene !== null
@@ -124,9 +131,40 @@ ShellRoot {
             Component.onDestruction: root.panels = root.panels.filter(item => item !== panel)
 
             Loader {
-                id: scene
+                id: earthLoader
                 anchors.fill: parent
-                sourceComponent: root.options.view === "venus" ? venusScene : earthScene
+                property bool retained: false
+                readonly property bool selected: panel.selectedScene === "earth"
+                // Keep texture providers alive after a visit. Destroying a
+                // recursive feedback source during a view switch can race
+                // Qt's render thread. Hidden solvers retain their last fields.
+                active: selected || retained
+                visible: selected
+                onSelectedChanged: if (selected) retained = true
+                Component.onCompleted: if (selected) retained = true
+                sourceComponent: earthScene
+            }
+            Loader {
+                id: venusLoader
+                anchors.fill: parent
+                property bool retained: false
+                readonly property bool selected: panel.selectedScene === "venus"
+                active: selected || retained
+                visible: selected
+                onSelectedChanged: if (selected) retained = true
+                Component.onCompleted: if (selected) retained = true
+                sourceComponent: venusScene
+            }
+            Loader {
+                id: saturnLoader
+                anchors.fill: parent
+                property bool retained: false
+                readonly property bool selected: panel.selectedScene === "saturn"
+                active: selected || retained
+                visible: selected
+                onSelectedChanged: if (selected) retained = true
+                Component.onCompleted: if (selected) retained = true
+                sourceComponent: saturnScene
             }
             Component {
                 id: earthScene
@@ -137,7 +175,7 @@ ShellRoot {
                     cloudTime: root.cloudTime
                     rotationPeriodSeconds: root.periodSeconds
                     modelTimeSeconds: root.modelTimeSeconds
-                    weatherEnabled: root.weatherEnabled
+                    weatherEnabled: root.weatherEnabled && panel.selectedScene === "earth"
                     planetVisualVersion: root.options.planetVisualVersion === 6 ? 6 : 8
                     fullGlobe: root.options.view === "globe" ? 1 : 0
                     cloudAmount: root.options.cloudAmount === undefined ? 0.90
@@ -153,6 +191,19 @@ ShellRoot {
                 Venus {
                     phase: root.phase
                     cloudTime: root.cloudTime
+                    rotationPeriodSeconds: root.periodSeconds
+                    modelTimeSeconds: root.cloudTime * 345600 / root.periodSeconds
+                    weatherEnabled: root.weatherEnabled && panel.selectedScene === "venus"
+                }
+            }
+            Component {
+                id: saturnScene
+                Saturn {
+                    phase: root.phase
+                    cloudTime: root.cloudTime
+                    rotationPeriodSeconds: root.periodSeconds
+                    modelTimeSeconds: root.cloudTime * 38520 / root.periodSeconds
+                    weatherEnabled: root.weatherEnabled && panel.selectedScene === "saturn"
                 }
             }
 
@@ -163,7 +214,24 @@ ShellRoot {
                     console.log("Planet snapshot", result.saveToFile(path), path);
                 });
             }
-            function diagnostics() { return currentScene ? currentScene.diagnostics : {ready: false}; }
+            function cachedScenes() {
+                return [earthLoader.item, venusLoader.item, saturnLoader.item].filter(item => item !== null);
+            }
+            function resetAllWeather() {
+                cachedScenes().forEach(item => item.resetWeather());
+            }
+            function diagnostics() {
+                if (!currentScene) return {ready: false};
+                return Object.assign({}, currentScene.diagnostics, {
+                    cachedWeather: cachedScenes().map(item => ({
+                        renderer: item.diagnostics.renderer,
+                        enabled: item.diagnostics.weather.enabled,
+                        stepPending: item.diagnostics.weather.stepPending,
+                        stepCount: item.diagnostics.weather.stepCount,
+                        evolutionTime: item.diagnostics.weather.evolutionTime
+                    }))
+                });
+            }
         }
     }
 
@@ -180,8 +248,8 @@ ShellRoot {
             return "Speed: " + number;
         }
         function view(value: string): string {
-            if (value !== "horizon" && value !== "globe" && value !== "venus")
-                return "View must be horizon, globe or venus";
+            if (value !== "horizon" && value !== "globe" && value !== "venus" && value !== "saturn")
+                return "View must be horizon, globe, venus or saturn";
             root.options = Object.assign({}, root.options, {view: value});
             configFile.setText(JSON.stringify(root.options, null, 2) + "\n");
             return "View: " + value;
@@ -204,8 +272,7 @@ ShellRoot {
             root.cloudTime = root.phase * root.periodSeconds;
             root.modelTimeSeconds = root.phase * 86400;
             root.panels.forEach(panel => {
-                if (panel.currentScene && typeof panel.currentScene.resetWeather === "function")
-                    panel.currentScene.resetWeather();
+                panel.resetAllWeather();
             });
             return "Phase: " + root.phase;
         }
@@ -220,14 +287,16 @@ ShellRoot {
             return JSON.stringify({
                 paused: root.paused, phase: root.phase, cloudPhase: root.cloudPhase,
                 backgroundMode: root.options.followNoctaliaWallpaper === true ? "follow-noctalia" : "primary",
-                cloudTime: root.cloudTime, modelTimeSeconds: root.modelTimeSeconds,
+                cloudTime: root.cloudTime, modelTimeSeconds: root.activeModelTimeSeconds,
                 weatherEnabled: root.weatherEnabled,
                 planetVisualVersion: root.options.planetVisualVersion === 6 ? 6 : 8,
-                modelDaySeconds: 86400, modelSecondsPerAnimationSecond: 86400 / root.periodSeconds,
+                modelDaySeconds: root.modelDaySeconds,
+                modelSecondsPerAnimationSecond: root.modelDaySeconds / root.periodSeconds,
                 speed: root.speed,
                 periodSeconds: root.periodSeconds, framesPerSecond: root.framesPerSecond,
                 view: root.options.view || "horizon",
-                renderer: root.options.view === "venus" ? "venus-prototype" : "weather-layers-v8",
+                renderer: root.options.view === "venus" ? "venus-retained-atmosphere-v1"
+                          : root.options.view === "saturn" ? "saturn-rings-atmosphere" : "weather-layers-v8",
                 screens: root.panels.filter(item => item.visible).map(item => item.modelData.name),
                 rendering: root.panels.map(item => item.diagnostics())
             });

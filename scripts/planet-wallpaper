@@ -14,11 +14,11 @@ case "${1:-status}" in
     off) systemctl --user disable --now planet-wallpaper.service ;;
     pause|resume|status) ipc "${1:-status}" ;;
     speed) ipc speed "${2:?Usage: planet-wallpaper speed 0.1..10}" ;;
-    view) ipc view "${2:?Usage: planet-wallpaper view horizon|globe|venus}" ;;
+    view) ipc view "${2:?Usage: planet-wallpaper view horizon|globe|venus|saturn}" ;;
     weather)
         case "${2:-status}" in
             on|off|toggle|status) ipc weather "${2:-status}" ;;
             *) printf '%s\n' 'Usage: planet-wallpaper weather {on|off|toggle|status}'; exit 2 ;;
         esac ;;
-    *) printf '%s\n' 'Usage: planet-wallpaper {on|off|pause|resume|status|speed 0.1..10|view horizon|globe|venus|weather on|off|toggle|status}'; exit 2 ;;
+    *) printf '%s\n' 'Usage: planet-wallpaper {on|off|pause|resume|status|speed 0.1..10|view horizon|globe|venus|saturn|weather on|off|toggle|status}'; exit 2 ;;
 esac
